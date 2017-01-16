@@ -1,20 +1,19 @@
 import lombok.Getter;
-import lombok.Setter;
 
 /**
  * Created by Thomas VENNER on 13/01/2017.
  */
 public class Data {
     @Getter
-    private String id;
+    private String url;
     @Getter
     private String word;
     private int index;
     @Getter
     private double frequency;
 
-    public Data(String id_, String word_, /*int index_,*/ double frequency_) {
-        id = id_;
+    public Data(String url_, String word_, /*int index_,*/ double frequency_) {
+        url = url_;
         word = word_;
         index = 0;
         frequency = frequency_;
@@ -23,7 +22,7 @@ public class Data {
     @Override
     public String toString() {
         return "{" +
-                "\n\tid='" + id + '\'' +
+                "\n\turl='" + url + '\'' +
                 ",\n\tword='" + word + '\'' +
 //                ",\n\tindex=" + index +
 //                ",\n\ttf=" + tf +

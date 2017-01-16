@@ -1,4 +1,3 @@
-import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jsoup.Jsoup;
@@ -9,72 +8,62 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Queue;
 
 /**
  * Created by Thomas VENNER on 13/01/2017.
  */
-public class Crawler {
+public class Crawler implements Runnable {
+    private final static int MAX_DOCUMENTS = 10;
     private static Logger logger;
 
-    @Getter
-    private static ArrayList<String> urlToCrawl;
-    private static ArrayList<String> documentsCrawled;
-    private static ArrayList<String> documentsUncrawled;
-    private static int MAX_DOCUMENTS = 500;
+    private Queue<String> urlsCrawled;
+    private Queue<String> urlsToCrawl;
+    private Queue<Document> documents;
 
     public static void initialize() {
-        urlToCrawl = new ArrayList<>();
-        documentsCrawled = new ArrayList<>();
-        documentsUncrawled = new ArrayList<>();
         logger = LogManager.getLogger(Crawler.class);
     }
 
-    public Crawler() { }
-
-    public void crawl(String url_) {
-        if (documentsCrawled.size() >= MAX_DOCUMENTS) {
-            return;
-        }
-        if (isURLValid(url_)
-                && !hasBeenCrawled(url_)) {
-            Utils.startChrono();
-            Document document;
-            try {
-                logger.info("Trying to crawl {} ({} crawled)", url_, documentsCrawled.size());
-                document = Jsoup.parse(new URL(url_), 10000);
-            } catch (IOException e) {
-                logger.error("Unable to crawl");
-                logger.trace("\tcrawl: {}ms", Utils.endChrono());
-                documentsUncrawled.add(url_);
-                return;
-            }
-            documentsCrawled.add(url_);
-            logger.trace("\tcrawl: {}ms", Utils.endChrono());
-            Indexer.treat(document);
-            for (final String url : getLinks(document)) {
-                if (url.startsWith("https://en.wikipedia.org/wiki/")
-                        && !url.contains("#")
-                        && !url.contains("/File:")
-                        && !url.contains("/Category:")
-                        && !url.contains("/Wikipedia:")
-                        && !url.contains("/Portal:")
-                        && !url.contains("/Template:")
-                        && !url.contains("/Help:")
-                        && !url.contains("/Talk:")
-                        && !url.contains("/MOS:"))
-                    crawl(url);
-            }
-        }
+    public Crawler(Queue<String> urlsCrawled_, Queue<String> urlsToCrawled_, Queue<Document> documents_) {
+        urlsCrawled = urlsCrawled_;
+        urlsToCrawl = urlsToCrawled_;
+        documents = documents_;
     }
 
-    private static boolean hasBeenCrawled(String url_) {
-        for (int i = 0; i < documentsCrawled.size(); i++) {
-            if (documentsCrawled.get(i).equals(url_)) return true;
+    public void run() {
+        while (urlsCrawled.size() < MAX_DOCUMENTS) {
+            String url;
+            if ((url = urlsToCrawl.poll()) != null) {
+                if (isURLValid(url)) {
+                    if (!urlsCrawled.contains(url)) {
+                        urlsCrawled.add(url);
+                        logger.info("Crawling {}", url);
+                        Document document;
+                        try {
+                            document = Jsoup.parse(new URL(url), 10000);
+                        } catch (IOException e) {
+                            logger.error("Unable to crawl {}", url);
+                            return;
+                        }
+                        documents.add(document);
+                        for (String externUrl : getLinks(document)) {
+                            if (externUrl.startsWith("https://en.wikipedia.org/wiki/")
+                                    && !externUrl.contains("#")
+                                    && !externUrl.contains("/File:")
+                                    && !externUrl.contains("/Category:")
+                                    && !externUrl.contains("/Wikipedia:")
+                                    && !externUrl.contains("/Portal:")
+                                    && !externUrl.contains("/Template:")
+                                    && !externUrl.contains("/Help:")
+                                    && !externUrl.contains("/Talk:")
+                                    && !externUrl.contains("/MOS:"))
+                                urlsToCrawl.add(externUrl);
+                        }
+                    }
+                }
+            }
         }
-        for (int i = 0; i < documentsUncrawled.size(); i++) {
-            if (documentsUncrawled.get(i).equals(url_)) return true;
-        }
-        return false;
     }
 
     private static ArrayList<String> getLinks(Document document_) {
@@ -98,16 +87,4 @@ public class Crawler {
     }
 
     private static void doNothing() { }
-
-    public static int getDocumentsCount() {
-        return documentsCrawled.size();
-    }
-
-    public static void remove(String s) {
-        documentsCrawled.remove(s);
-    }
-
-    public static void increaseCapacity(int i) {
-        MAX_DOCUMENTS += i;
-    }
 }
