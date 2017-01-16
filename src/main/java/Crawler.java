@@ -14,7 +14,7 @@ import java.util.Queue;
  * Created by Thomas VENNER on 13/01/2017.
  */
 public class Crawler implements Runnable {
-    private final static int MAX_DOCUMENTS = 10;
+    private final static int MAX_DOCUMENTS = 500;
     private static Logger logger;
 
     private Queue<String> urlsCrawled;

@@ -1,3 +1,4 @@
+import javafx.util.Pair;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -45,11 +46,12 @@ public class Engine extends Indexable implements Runnable {
                     }
                 } else {
                     query = cleanUp(query);
+                    int count = 3;
                     ArrayList<Data> queryDoc = getDatas("query", query);
                     ArrayList<Data> tfIdfs = getTfIdfs(queryDoc);
 //                    logger.info("tfIdfs: {}", tfIdfs);
-                    foo(tfIdfs);
-//                    logger.info("results for {}: {}", queryHashMap, search(queryHashMap, 3));
+                    List<Pair<String, Double>> vectors = search(tfIdfs, count);
+                    logger.info("results for {}: {}", queryDoc, vectors);
                 }
             }
         } catch (IOException e) {
@@ -57,9 +59,47 @@ public class Engine extends Indexable implements Runnable {
         }
     }
 
-    private void foo(ArrayList<Data> tfIdfs) {
+    private List<Pair<String, Double>> search(ArrayList<Data> tfIdfs, int count) {
         tfIdfs.sort(Comparator.comparing(Data::getWord));
         logger.info(tfIdfs);
+        HashMap<String, ArrayList<Double>> h = new HashMap<>();
+        for (Data data : tfIdfs) {
+            if (!data.getUrl().equals("query") && !h.keySet().contains(data.getUrl())) {
+                h.put(data.getUrl(), new ArrayList<>());
+            }
+        }
+        ArrayList<Double> queryVector = new ArrayList<>();
+        for (Data d : tfIdfs.stream().filter(data -> data.getUrl().equals("query")).collect(Collectors.toList())) {
+            queryVector.add(d.getFrequency());
+            for (String key : h.keySet()) {
+                List<Data> entry = tfIdfs
+                        .stream()
+                        .filter(data -> d.getWord().equals(data.getWord()) && key.equals(data.getUrl()))
+                        .limit(1)
+                        .collect(Collectors.toList());
+                if (entry.isEmpty()) {
+                    h.get(key).add(0d);
+                }
+                else {
+                    h.get(key).add(entry.get(0).getFrequency());
+                }
+            }
+        }
+        DocumentVector queryDocumentVector = new DocumentVector("query", queryVector);
+        ArrayList<DocumentVector> vectors = new ArrayList<>();
+        for (String key : h.keySet()) {
+            vectors.add(new DocumentVector(key, h.get(key)));
+        }
+        ArrayList<Pair<String, Double>> dotProducts = new ArrayList<>();
+        for (DocumentVector doc : vectors) {
+            dotProducts.add(new Pair<>(doc.getUrl(), queryDocumentVector.dotProduct(doc)));
+        }
+
+        return dotProducts
+                .stream()
+                .sorted((p1, p2) -> (int) Math.signum(p2.getValue() - p1.getValue()))
+                .limit(count)
+                .collect(Collectors.toList());
     }
 
     private static String readStdin() throws IOException {
@@ -71,7 +111,7 @@ public class Engine extends Indexable implements Runnable {
         HashMap<String, Double> results = new HashMap<>();
         ArrayList<String> words = new ArrayList<>();
 //        query.entrySet().forEach(entry -> words.add(entry.getKey()));
-//        ArrayList<Data> dataArray = getTfIdfs(query.keySet());
+//        ArrayList<Data> dataArray =
 //        dataArray.stream().filter(data -> query.keySet().contains(data.getWord())).forEach(data -> {
 //            String url = data.getUrl();
 //            if (!results.keySet().contains(url)) {
@@ -120,7 +160,10 @@ public class Engine extends Indexable implements Runnable {
                 .filter(data -> words.contains(data.getWord()))
                 .forEach(data -> {
                     if (!wordsFrequency.containsKey(data.getWord())) {
-                        wordsFrequency.put(data.getWord(), datas.stream().filter(d -> d.getWord().equals(data.getWord())).count() + 1);
+                        wordsFrequency.put(data.getWord(), datas
+                                .stream()
+                                .filter(d -> d.getWord().equals(data.getWord()))
+                                .count() + 1);
                     }
                     Long frequency = wordsFrequency.get(data.getWord());
                     datasArray.add(new Data(
@@ -134,7 +177,10 @@ public class Engine extends Indexable implements Runnable {
         queryArray
                 .forEach(data -> {
                     if (!wordsFrequency.containsKey(data.getWord())) {
-                        wordsFrequency.put(data.getWord(), datas.stream().filter(d -> d.getWord().equals(data.getWord())).count() + 1);
+                        wordsFrequency.put(data.getWord(), datas
+                                .stream()
+                                .filter(d -> d.getWord().equals(data.getWord()))
+                                .count() + 1);
                     }
                     Long frequency = wordsFrequency.get(data.getWord());
                     datasArray.add(new Data(
