@@ -1,3 +1,4 @@
+import io.vertx.core.eventbus.EventBus;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jsoup.Jsoup;
@@ -9,32 +10,31 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedDeque;
 
 /**
  * Created by Thomas VENNER on 13/01/2017.
  */
-public class Crawler implements Runnable {
-    private final static int MAX_DOCUMENTS = 500;
+public class Crawler {
+    private static long MAX_DOCUMENTS = 50;
     private static Logger logger;
 
-    private Queue<String> urlsCrawled;
-    private Queue<String> urlsToCrawl;
-    private Queue<Document> documents;
+    private static Queue<String> urlsCrawled;
 
     public static void initialize() {
         logger = LogManager.getLogger(Crawler.class);
+        urlsCrawled = new ConcurrentLinkedDeque<>();
     }
 
-    public Crawler(Queue<String> urlsCrawled_, Queue<String> urlsToCrawled_, Queue<Document> documents_) {
-        urlsCrawled = urlsCrawled_;
-        urlsToCrawl = urlsToCrawled_;
-        documents = documents_;
+    private EventBus eventBus;
+
+    public Crawler(EventBus eventBus_) {
+        eventBus = eventBus_;
     }
 
-    public void run() {
-        while (urlsCrawled.size() < MAX_DOCUMENTS) {
-            String url;
-            if ((url = urlsToCrawl.poll()) != null) {
+    public void crawl(String url) {
+        if (urlsCrawled.size() < MAX_DOCUMENTS) {
+            if (url != null) {
                 if (isURLValid(url)) {
                     if (!urlsCrawled.contains(url)) {
                         urlsCrawled.add(url);
@@ -46,22 +46,16 @@ public class Crawler implements Runnable {
                             logger.error("Unable to crawl {}", url);
                             return;
                         }
-                        documents.add(document);
+                        eventBus.send("/api/index", document);
                         for (String externUrl : getLinks(document)) {
-//                            if (externUrl.startsWith("https://en.wikipedia.org/wiki/")
-//                                    && !externUrl.contains("#")
-//                                    && !externUrl.contains("/File:")
-//                                    && !externUrl.contains("/Category:")
-//                                    && !externUrl.contains("/Wikipedia:")
-//                                    && !externUrl.contains("/Portal:")
-//                                    && !externUrl.contains("/Template:")
-//                                    && !externUrl.contains("/Help:")
-//                                    && !externUrl.contains("/Talk:")
-//                                    && !externUrl.contains("/MOS:"))
-                                urlsToCrawl.add(externUrl);
+                            eventBus.send("/api/crawl", externUrl);
                         }
                     }
+                } else {
+                    logger.info("Invalid URL: {}", url);
                 }
+            } else {
+                logger.error("URL null");
             }
         }
     }

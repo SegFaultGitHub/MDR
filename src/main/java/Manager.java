@@ -1,14 +1,11 @@
 import io.vertx.core.Vertx;
 import io.vertx.core.VertxOptions;
+import io.vertx.core.eventbus.MessageConsumer;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jsoup.nodes.Document;
 
-import java.io.IOException;
-import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedDeque;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.ArrayList;
 
 /**
  * Created by SegFault on 16/01/2017.
@@ -18,11 +15,6 @@ public class Manager {
 
     private final int THREADS = 10;
 
-    private Queue<String> urlsCrawled;
-    private Queue<String> urlsToCrawl;
-    private Queue<Document> documents;
-    private Queue<Data> datas;
-
     public Manager() {
         logger = LogManager.getLogger(Manager.class);
 
@@ -30,29 +22,40 @@ public class Manager {
         Indexer.initialize();
         Indexable.initialize();
         Engine.initialize();
+    }
 
-        HttpVerticle httpVerticle = new HttpVerticle(8080);
+    public void executeWithVerticles() {
         VertxOptions options = new VertxOptions();
         options.setBlockedThreadCheckInterval(1000 * 60 * 60);
         Vertx vertx = Vertx.vertx(options);
+
+        vertx.eventBus().registerDefaultCodec(Document.class, new DocumentCodec());
+        vertx.eventBus().registerDefaultCodec(DataWrapper.class, new DataWrapperCodec());
+
+        HttpVerticle httpVerticle = new HttpVerticle(8080);
         vertx.deployVerticle(httpVerticle);
 
-        urlsCrawled = new ConcurrentLinkedDeque<>();
-        urlsToCrawl = new ConcurrentLinkedDeque<>();
-        documents = new ConcurrentLinkedDeque<>();
-        datas = new ConcurrentLinkedDeque<>();
-
-        urlsToCrawl.add("https://en.wikipedia.org/wiki/France");
-    }
-
-    public void exectute() throws IOException {
-        ExecutorService executor = Executors.newCachedThreadPool();
-
         for (int i = 0; i < THREADS; i++) {
-            executor.execute(() -> new Thread(new Crawler(urlsCrawled, urlsToCrawl, documents)).start());
-            executor.execute(() -> new Thread(new Indexer(datas, documents)).start());
+            CrawlerVerticle crawlerVerticle = new CrawlerVerticle();
+            vertx.deployVerticle(crawlerVerticle);
+            MessageConsumer<String> consumerUrls = vertx.eventBus().consumer("/api/crawl");
+            consumerUrls.handler(message ->
+                    crawlerVerticle.crawl(message.body())
+            );
+
+            IndexerVerticle indexerVerticle = new IndexerVerticle();
+            vertx.deployVerticle(indexerVerticle);
+            MessageConsumer<CustomDocument> consumerDocument = vertx.eventBus().consumer("/api/index");
+            consumerDocument.handler(message ->
+                    indexerVerticle.index(message.body())
+            );
         }
 
-        executor.execute(() -> new Thread(new Engine(datas, urlsCrawled)).start());
+        IndexVerticle indexVerticle = new IndexVerticle();
+        vertx.deployVerticle(indexVerticle);
+        MessageConsumer<ArrayList<Data>> consumerAddData = vertx.eventBus().consumer("/api/addData");
+        consumerAddData.handler(message ->
+                indexVerticle.addData(message.body())
+        );
     }
 }

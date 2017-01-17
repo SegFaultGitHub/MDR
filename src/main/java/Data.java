@@ -10,7 +10,6 @@ public class Data {
     private String url;
     @Getter
     private String word;
-    private int index;
     @Getter
     private double frequency;
     @Getter
@@ -19,7 +18,6 @@ public class Data {
     public Data(String url_, String word_, /*int index_,*/ double frequency_, ArrayList<Integer> positions_) {
         url = url_;
         word = word_;
-        index = 0;
         frequency = frequency_;
         positions = positions_;
     }

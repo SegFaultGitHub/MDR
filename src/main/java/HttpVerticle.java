@@ -2,6 +2,7 @@ import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Future;
 import io.vertx.core.http.HttpServer;
 import io.vertx.ext.web.Router;
+import org.jsoup.nodes.Document;
 
 /**
  * Created by SegFault on 17/01/2017.
@@ -20,9 +21,11 @@ public class HttpVerticle extends AbstractVerticle {
         HttpServer server = vertx.createHttpServer();
         Router router = Router.router(vertx);
 
-        router.get("/search/:query").handler((context) -> {
-            String query = context.request().getParam("query");
-            context.response().end("Hello Worlds! : " + query);
+        router.get("/api/crawl/:url").handler(context -> {
+            String url = context.request().getParam("url");
+//            val cleansed = if (url.matches(Constants.HTTP_REGEXP)) url else "http://$url"
+            vertx.eventBus().send("/api/crawl", "https://" + url + "/");
+            context.response().end("Started crawl of root URL " + url);
         });
 
         server.requestHandler(router::accept).listen(port);
