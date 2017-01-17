@@ -42,33 +42,4 @@ public class Indexer extends Indexable implements Runnable {
             }
         }
     }
-
-//    public static ArrayList<SearchResult> getReleventResults(String word, int count, ArrayList<Data> datas) {
-//        ArrayList<Data> array = (ArrayList<Data>) datas.stream().filter(d -> d.getWord().equals(word)).sorted(
-//                (d1, d2) -> (int) Math.signum(d2.getFrequency() - d1.getFrequency())
-//        ).limit(count).collect(Collectors.toList());
-//        ArrayList<SearchResult> results = new ArrayList<>();
-//        array.forEach(data -> results.add(new SearchResult(data.getUrl(), data.getFrequency())));
-//        return results;
-//    }
-//
-//    public static ArrayList<SearchResult> getReleventResults(ArrayList<String> words, int count, ArrayList<Data> datas) {
-//        datas.sort((d1, d2) -> (int) Math.signum(d2.getFrequency() - d1.getFrequency()));
-//        HashMap<String, Double> hashMap = new HashMap<>();
-//        ArrayList<SearchResult> results = new ArrayList<>();
-//        datas.stream().filter(data -> words.contains(data.getWord())).forEach(data -> {
-//            String url = data.getUrl();
-//            if (!hashMap.keySet().contains(url)) {
-//                hashMap.put(url, 1 + data.getFrequency());
-//            } else {
-//                hashMap.put(url, (1 + data.getFrequency()) * hashMap.get(url));
-//            }
-//        });
-//        for (HashMap.Entry<String, Double> entry : hashMap.entrySet()) {
-//            results.add(new SearchResult(entry));
-//        }
-//        return (ArrayList<SearchResult>) results.stream().sorted(
-//                (r1, r2) -> (int) Math.signum(r2.getTfIdf() - r1.getTfIdf())
-//        ).limit(count).collect(Collectors.toList());
-//    }
 }

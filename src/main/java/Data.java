@@ -1,5 +1,7 @@
 import lombok.Getter;
 
+import java.util.ArrayList;
+
 /**
  * Created by Thomas VENNER on 13/01/2017.
  */
@@ -11,12 +13,15 @@ public class Data {
     private int index;
     @Getter
     private double frequency;
+    @Getter
+    private ArrayList<Integer> positions;
 
-    public Data(String url_, String word_, /*int index_,*/ double frequency_) {
+    public Data(String url_, String word_, /*int index_,*/ double frequency_, ArrayList<Integer> positions_) {
         url = url_;
         word = word_;
         index = 0;
         frequency = frequency_;
+        positions = positions_;
     }
 
     @Override
@@ -24,9 +29,8 @@ public class Data {
         return "{" +
                 "\n\turl='" + url + '\'' +
                 ",\n\tword='" + word + '\'' +
-//                ",\n\tindex=" + index +
-//                ",\n\ttf=" + tf +
                 ",\n\tfrequency=" + frequency +
+                ",\n\tpositions=" + positions +
                 "\n}";
     }
 }

@@ -33,25 +33,33 @@ public class Engine extends Indexable implements Runnable {
                 if (query.startsWith("!")) {
                     if (query.equals("!datas")) {
                         String[] _words = query.split(" +");
-                        ArrayList<String> words = new ArrayList<>();
+                        ArrayList<Data> dataArray = new ArrayList<>();
                         for (int i = 1; i < _words.length; i++) {
-                            words.add(_words[i]);
+                            final int finalI = i;
+                            dataArray.addAll(datas
+                                    .stream()
+                                    .filter(data -> data.getWord().equals(_words[finalI]))
+                                    .collect(Collectors.toList()));
                         }
-                        logger.info(datas/*
-                                .stream()
-                                .filter(data -> words.contains(data.getWord()))
-                                .collect(Collectors.toList())*/);
+                        logger.info(datas);
                     } else if (query.equals("!seePages")) {
                         logger.info("Pages crawled: {}", urlsCrawled.size());
                     }
                 } else {
-                    query = cleanUp(query);
                     int count = 3;
-                    ArrayList<Data> queryDoc = getDatas("query", query);
+                    ArrayList<Data> queryDoc = getDatas("query", cleanUp(query));
                     ArrayList<Data> tfIdfs = getTfIdfs(queryDoc);
 //                    logger.info("tfIdfs: {}", tfIdfs);
-                    List<Pair<String, Double>> vectors = search(tfIdfs, count);
-                    logger.info("results for {}: {}", queryDoc, vectors);
+                    List<Pair<String, Double>> vectors = orderedSearch(tfIdfs, count);
+                    if (vectors == null || vectors.isEmpty()) {
+                        logger.info("No result for \"{}\"", query);
+                    } else {
+                        String results = "";
+                        for (Pair p : vectors) {
+                            results += "\n\t" + p.getKey() + " (" + p.getValue() + ")";
+                        }
+                        logger.info("Most relevant results for \"{}\": {}", query, results);
+                    }
                 }
             }
         } catch (IOException e) {
@@ -59,9 +67,8 @@ public class Engine extends Indexable implements Runnable {
         }
     }
 
-    private List<Pair<String, Double>> search(ArrayList<Data> tfIdfs, int count) {
+    private ArrayList<Pair<String, Double>> getVectors(ArrayList<Data> tfIdfs) {
         tfIdfs.sort(Comparator.comparing(Data::getWord));
-        logger.info(tfIdfs);
         HashMap<String, ArrayList<Double>> h = new HashMap<>();
         for (Data data : tfIdfs) {
             if (!data.getUrl().equals("query") && !h.keySet().contains(data.getUrl())) {
@@ -94,6 +101,11 @@ public class Engine extends Indexable implements Runnable {
         for (DocumentVector doc : vectors) {
             dotProducts.add(new Pair<>(doc.getUrl(), queryDocumentVector.dotProduct(doc)));
         }
+        return dotProducts;
+    }
+
+    private List<Pair<String, Double>> search(ArrayList<Data> tfIdfs, int count) {
+        ArrayList<Pair<String, Double>> dotProducts = getVectors(tfIdfs);
 
         return dotProducts
                 .stream()
@@ -102,51 +114,91 @@ public class Engine extends Indexable implements Runnable {
                 .collect(Collectors.toList());
     }
 
+    private List<Pair<String, Double>> orderedSearch(ArrayList<Data> tfIdfs, int count) {
+        ArrayList<Pair<String, Double>> dotProducts = getVectors(tfIdfs);
+        List<Data> query = tfIdfs
+                .stream()
+                .filter(data -> data.getUrl().equals("query"))
+                .collect(Collectors.toList());
+        List<String> urls = new ArrayList<>();
+        for (Data data : tfIdfs
+                .stream()
+                .filter(data -> !data.getUrl().equals("query"))
+                .collect(Collectors.toList())) {
+            if (!urls.contains(data.getUrl())) {
+                urls.add(data.getUrl());
+            }
+        }
+        logger.info("urls: {}", urls);
+        for (String url : urls) {
+            List<Data> datasUrl = tfIdfs
+                    .stream()
+                    .filter(data -> data.getUrl().equals(url))
+                    .collect(Collectors.toList());
+            if (isOrdered(query, datasUrl)) {
+                for (int i = 0; i < dotProducts.size(); i++) {
+                    if (dotProducts.get(i).getKey().equals(url)) {
+                        Pair<String, Double> pair = dotProducts.get(i);
+                        dotProducts.remove(i);
+                        dotProducts.add(new Pair<>(pair.getKey(), pair.getValue() * 2));
+                        break;
+                    }
+                }
+            }
+        }
+        return dotProducts
+                .stream()
+                .sorted((p1, p2) -> (int) Math.signum(p2.getValue() - p1.getValue()))
+                .limit(count)
+                .collect(Collectors.toList());
+    }
+
+    private boolean isOrdered(List<Data> query, List<Data> document) {
+        List<String> wordsQuery = makeSentence(query);
+        List<String> wordsDocument = makeSentence(document);
+        List<Integer> positions = new ArrayList<>();
+        for (int i = 0; i < wordsDocument.size(); i++) {
+            if (wordsDocument.get(i).equals(wordsQuery.get(0))) {
+                positions.add(i);
+            }
+        }
+        boolean result = false;
+        for (int position : positions) {
+            int n = 0;
+            boolean good = true;
+            for (String word : wordsQuery) {
+                if (position + n >= wordsDocument.size() || !wordsDocument.get(position + n).equals(word)) {
+                    good = false;
+                    break;
+                }
+                n++;
+            }
+            if (good) {
+                result = true;
+                break;
+            }
+        }
+        return result;
+    }
+
+    private ArrayList<String> makeSentence(List<Data> datas) {
+        ArrayList<String> words = new ArrayList<>();
+        for (Data data : datas) {
+            for (int pos : data.getPositions()) {
+                for (int i = words.size(); i <= pos; i++) {
+                    words.add("");
+                }
+                words.remove(pos);
+                words.add(pos, data.getWord());
+            }
+        }
+        return words;
+    }
+
     private static String readStdin() throws IOException {
         BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
         return br.readLine();
     }
-
-    private HashMap<String, Double> search(HashMap<String, Integer> query, int count) {
-        HashMap<String, Double> results = new HashMap<>();
-        ArrayList<String> words = new ArrayList<>();
-//        query.entrySet().forEach(entry -> words.add(entry.getKey()));
-//        ArrayList<Data> dataArray =
-//        dataArray.stream().filter(data -> query.keySet().contains(data.getWord())).forEach(data -> {
-//            String url = data.getUrl();
-//            if (!results.keySet().contains(url)) {
-//                results.put(url, query.get(data.getWord()) * data.getFrequency());
-//            } else {
-//                results.put(url, (query.get(data.getWord()) * data.getFrequency()) * results.get(url));
-//            }
-//        });
-//        return results.entrySet()
-//                .stream()
-//                .sorted(Map.Entry.comparingByValue(Collections.reverseOrder()))
-//                .limit(count)
-//                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> e1, LinkedHashMap::new));
-        return results;
-    }
-
-//    public static ArrayList<SearchResult> search(String query, int count, int documents) {
-//        query = query.toLowerCase().trim();
-//        if (Indexer.getLemmas().keySet().contains(query)) query = Indexer.getLemmas().get(query);
-//        ArrayList<SearchResult> result = new ArrayList<>();
-//        if (Indexer.getStopWords().contains(query)) return result;
-//
-//        ArrayList<Data> tfIdfs = Indexer.getTfIdfs(documents, query);
-//        return Indexer.getReleventResults(query, count, tfIdfs);
-//    }
-//
-//    public static ArrayList<SearchResult> search(String[] query, int count, int documents) {
-//        ArrayList<SearchResult> result = new ArrayList<>();
-//        ArrayList<Data> tfIdfs = new ArrayList<>();
-//        for (String word : query) {
-//            tfIdfs.addAll(Indexer.getTfIdfs(documents, word));
-//        }
-//
-//        return Indexer.getReleventResults((ArrayList<String>) Arrays.stream(query).collect(Collectors.toList()), count, tfIdfs);
-//    }
 
     private ArrayList<Data> getTfIdfs(ArrayList<Data> queryArray) {
         ArrayList<String> words = new ArrayList<>();
@@ -171,8 +223,8 @@ public class Engine extends Indexable implements Runnable {
                             data.getWord(),
                             frequency == 0 ?
                                     0 :
-                                    data.getFrequency() * Math.log10((urlsCrawled.size() + 1) / frequency)
-                    ));
+                                    data.getFrequency() * Math.log10((urlsCrawled.size() + 1) / frequency),
+                            data.getPositions()));
                 });
         queryArray
                 .forEach(data -> {
@@ -188,11 +240,9 @@ public class Engine extends Indexable implements Runnable {
                             data.getWord(),
                             frequency == 0 ?
                                     0 :
-                                    data.getFrequency() * Math.log10((urlsCrawled.size() + 1) / frequency)
-                    ));
+                                    data.getFrequency() * Math.log10((urlsCrawled.size() + 1) / frequency),
+                            data.getPositions()));
                 });
-        logger.info("words: {}", wordsFrequency);
-//        logger.info("datas: {}", datas.stream().filter(data -> words.contains(data.getWord())).collect(Collectors.toList()));
         return datasArray;
     }
 }

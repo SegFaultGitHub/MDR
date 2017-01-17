@@ -1,3 +1,4 @@
+import javafx.util.Pair;
 import org.jsoup.nodes.Document;
 
 import java.io.BufferedReader;
@@ -62,31 +63,47 @@ public class Indexable {
         return clean;
     }
 
-    protected HashMap<String, Integer> reduceAndTokenize(String input) {
-        HashMap<String, Integer> lemmasCount = new HashMap<>();
+    protected HashMap<String, Pair<Integer, ArrayList<Integer>>> reduceAndTokenize(String input) {
+        HashMap<String, Pair<Integer, ArrayList<Integer>>> lemmasCount = new HashMap<>();
         ArrayList<String> cleanSplit = new ArrayList<>();
         Collections.addAll(cleanSplit, input.split(" +"));
-        for (int i = 0; i < cleanSplit.size(); i++) {
+        for (int i = 0, j = 0; i < cleanSplit.size(); i++, j++) {
             String word = cleanSplit.get(i);
             String lemma = getLemma(word);
-            if (lemmasCount.containsKey(lemma)) {
-                lemmasCount.put(lemma, lemmasCount.get(lemma) + 1);
-            } else if (!stopWords.contains(lemma)) {
-                lemmasCount.put(lemma, 1);
+            if (stopWords.contains(lemma)) {
+                j--;
+                continue;
             }
+            if (lemmasCount.containsKey(lemma)) {
+                lemmasCount.put(
+                        lemma,
+                        new Pair<>(lemmasCount.get(lemma).getKey() + 1, lemmasCount.get(lemma).getValue())
+                );
+            } else {
+                lemmasCount.put(
+                        lemma,
+                        new Pair<>(1, new ArrayList<>())
+                );
+            }
+            lemmasCount.get(lemma).getValue().add(j);
         }
         return lemmasCount;
     }
 
-    protected ArrayList<Data> fillDataArray(String url, HashMap<String, Integer> lemmasCount) {
+    protected ArrayList<Data> fillDataArray(String url, HashMap<String, Pair<Integer, ArrayList<Integer>>> lemmasCount) {
         ArrayList<Data> datasArray = new ArrayList<>();
         double D = 0;
         for (String key : lemmasCount.keySet()) {
-            D += lemmasCount.get(key) * lemmasCount.get(key);
+            D += lemmasCount.get(key).getKey() * lemmasCount.get(key).getKey();
         }
         D = Math.sqrt(D);
         for (String key : lemmasCount.keySet()) {
-            datasArray.add(new Data(url, key, (double) lemmasCount.get(key) / D));
+            datasArray.add(new Data(
+                    url,
+                    key,
+                    (double) lemmasCount.get(key).getKey() / D,
+                    lemmasCount.get(key).getValue()
+            ));
         }
         return datasArray;
     }

@@ -48,16 +48,16 @@ public class Crawler implements Runnable {
                         }
                         documents.add(document);
                         for (String externUrl : getLinks(document)) {
-                            if (externUrl.startsWith("https://en.wikipedia.org/wiki/")
-                                    && !externUrl.contains("#")
-                                    && !externUrl.contains("/File:")
-                                    && !externUrl.contains("/Category:")
-                                    && !externUrl.contains("/Wikipedia:")
-                                    && !externUrl.contains("/Portal:")
-                                    && !externUrl.contains("/Template:")
-                                    && !externUrl.contains("/Help:")
-                                    && !externUrl.contains("/Talk:")
-                                    && !externUrl.contains("/MOS:"))
+//                            if (externUrl.startsWith("https://en.wikipedia.org/wiki/")
+//                                    && !externUrl.contains("#")
+//                                    && !externUrl.contains("/File:")
+//                                    && !externUrl.contains("/Category:")
+//                                    && !externUrl.contains("/Wikipedia:")
+//                                    && !externUrl.contains("/Portal:")
+//                                    && !externUrl.contains("/Template:")
+//                                    && !externUrl.contains("/Help:")
+//                                    && !externUrl.contains("/Talk:")
+//                                    && !externUrl.contains("/MOS:"))
                                 urlsToCrawl.add(externUrl);
                         }
                     }
