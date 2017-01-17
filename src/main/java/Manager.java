@@ -1,3 +1,5 @@
+import io.vertx.core.Vertx;
+import io.vertx.core.VertxOptions;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jsoup.nodes.Document;
@@ -28,6 +30,12 @@ public class Manager {
         Indexer.initialize();
         Indexable.initialize();
         Engine.initialize();
+
+        HttpVerticle httpVerticle = new HttpVerticle(8080);
+        VertxOptions options = new VertxOptions();
+        options.setBlockedThreadCheckInterval(1000 * 60 * 60);
+        Vertx vertx = Vertx.vertx(options);
+        vertx.deployVerticle(httpVerticle);
 
         urlsCrawled = new ConcurrentLinkedDeque<>();
         urlsToCrawl = new ConcurrentLinkedDeque<>();

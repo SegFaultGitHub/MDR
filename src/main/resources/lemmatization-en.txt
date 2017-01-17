@@ -33320,7 +33320,7 @@ servant,servants
 serve,served
 serve,serves
 serve,serving
-server,servers
+httpVerticle,servers
 service,serviced
 service,services
 service,servicing

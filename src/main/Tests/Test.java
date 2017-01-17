@@ -1,7 +1,8 @@
-import java.util.ArrayList;
+import io.vertx.core.Vertx;
+import io.vertx.core.VertxOptions;
+
 import java.util.Queue;
 import java.util.Random;
-import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
@@ -12,7 +13,7 @@ import java.util.concurrent.LinkedBlockingDeque;
 public class Test {
     public static Random random = new Random();
 
-    private static class Producer extends Thread {
+    private static class Producer implements Runnable {
         private Queue<String> queue;
         private int n;
 
@@ -27,7 +28,7 @@ public class Test {
                 System.out.println("prod" + n + ": " + r);
                 queue.add(r);
                 try {
-                    sleep(1000);
+                    Thread.sleep(1000);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
@@ -38,13 +39,13 @@ public class Test {
             int l = random.nextInt(5) + 3;
             String s = "";
             for (int i = 0; i < l; i++) {
-                s += (char)(random.nextInt(26) + 'a');
+                s += (char) (random.nextInt(26) + 'a');
             }
             return s;
         }
     }
 
-    private static class Consumer extends Thread {
+    private static class Consumer implements Runnable {
         private Queue<String> queue;
         private int n;
 
@@ -68,19 +69,23 @@ public class Test {
 
         public Manager() {
             Executor executor = Executors.newCachedThreadPool();
-            for (int i = 0; i < 500; i++) {
+            for (int i = 0; i < 10; i++) {
                 final int n = i;
                 executor.execute(() -> {
-                    new Producer(n, queue).start();
+                    new Thread(new Producer(n, queue)).start();
                 });
                 executor.execute(() -> {
-                    new Consumer(n, queue).start();
+                    new Thread(new Consumer(n, queue)).start();
                 });
             }
         }
     }
 
-    public static void main(String[] args) {
-        new Manager();
+    public void main(String[] args) throws Exception {
+//        new Manager();
+
+        HttpVerticle httpVerticle = new HttpVerticle(8080);
+        Vertx vertx = Vertx.vertx(new VertxOptions().setWorkerPoolSize(40));
+        vertx.deployVerticle(httpVerticle);//, new DeploymentOptions().set);
     }
 }
